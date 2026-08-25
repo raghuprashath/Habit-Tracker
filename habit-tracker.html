@@ -382,6 +382,25 @@ td.del-cell { text-align: center; padding-left: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(40,50,80,0.6); border-radius: 3px; }
 
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .charts-grid { display: none !important; }
+  body { padding: 14px 12px 40px; }
+  .overall-bar { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .overall-card { padding: 12px 14px; }
+  .overall-card .oc-value { font-size: 22px; }
+  header { margin-bottom: 16px; }
+  .logo { font-size: 15px; }
+  #month-label { font-size: 15px; min-width: 120px; }
+  .cat-header { padding: 12px 14px; flex-wrap: wrap; gap: 8px; }
+  .cat-stats { gap: 10px; }
+  .cat-progress-bar { width: 70px; }
+  .habit-table-wrap { padding: 0 12px 4px; }
+  .cat-add-row { padding: 10px 14px 12px; }
+  .cat-stat-footer { padding: 10px 14px 12px; gap: 14px; }
+  .quote-bar blockquote { font-size: 13px; }
+}
+
 /* ════════════════════════════════
    CATEGORY STAT FOOTER
 ════════════════════════════════ */
@@ -567,10 +586,14 @@ canvas#habit-chart, canvas#overall-chart {
 
 <header>
   <div class="logo">Raghu Prashath M A</div>
-  <div class="month-nav">
-    <button id="prev-btn">&#8249;</button>
-    <div id="month-label"></div>
-    <button id="next-btn">&#8250;</button>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="month-nav">
+      <button id="prev-btn">&#8249;</button>
+      <div id="month-label"></div>
+      <button id="next-btn">&#8250;</button>
+    </div>
+    <button onclick="exportData()" style="background:rgba(0,201,167,0.12);border:1px solid rgba(0,201,167,0.4);color:#00c9a7;font-family:var(--mono);font-size:11px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;letter-spacing:.05em" title="Export data to share across devices">⬇ Export</button>
+    <label style="background:rgba(90,140,220,0.12);border:1px solid rgba(90,140,220,0.4);color:#5b9cf6;font-family:var(--mono);font-size:11px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;letter-spacing:.05em" title="Import data from another device">⬆ Import<input type="file" accept=".json" onchange="importData(event)" style="display:none"/></label>
   </div>
 </header>
 
