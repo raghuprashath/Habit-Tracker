@@ -587,13 +587,14 @@ canvas#habit-chart, canvas#overall-chart {
 <header>
   <div class="logo">Raghu Prashath M A</div>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span id="sync-status" style="font-family:var(--mono);font-size:11px;letter-spacing:.05em;transition:color .3s"></span>
     <div class="month-nav">
       <button id="prev-btn">&#8249;</button>
       <div id="month-label"></div>
       <button id="next-btn">&#8250;</button>
     </div>
-    <button onclick="exportData()" style="background:rgba(0,201,167,0.12);border:1px solid rgba(0,201,167,0.4);color:#00c9a7;font-family:var(--mono);font-size:11px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;letter-spacing:.05em" title="Export data to share across devices">⬇ Export</button>
-    <label style="background:rgba(90,140,220,0.12);border:1px solid rgba(90,140,220,0.4);color:#5b9cf6;font-family:var(--mono);font-size:11px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;letter-spacing:.05em" title="Import data from another device">⬆ Import<input type="file" accept=".json" onchange="importData(event)" style="display:none"/></label>
+    <button onclick="exportData()" style="background:rgba(0,201,167,0.12);border:1px solid rgba(0,201,167,0.4);color:#00c9a7;font-family:var(--mono);font-size:11px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;letter-spacing:.05em">⬇ Export</button>
+    <label style="background:rgba(90,140,220,0.12);border:1px solid rgba(90,140,220,0.4);color:#5b9cf6;font-family:var(--mono);font-size:11px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;letter-spacing:.05em">⬆ Import<input type="file" accept=".json" onchange="importData(event)" style="display:none"/></label>
   </div>
 </header>
 
@@ -713,24 +714,65 @@ const CATEGORIES = [
 // STATE
 // ══════════════════════════════════════════════
 const STORAGE_KEY = 'habit_tracker_v3';
-let viewYM = toYM(new Date());
+const BIN_ID  = '6a8e18bcda38895dfe108cf0';
+const BIN_KEY = '$2a$10$ziN8dxeQPnWDW1S7RrA47eYpeSsoLaIlyKBwONmVVX9DSYPrmqqVO';
+const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+const HDR = { 'Content-Type':'application/json', 'X-Master-Key': BIN_KEY };
+
+let syncTimeout = null;
+
+function showSyncStatus(status) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const map = {
+    saving: ['⟳ Syncing...', '#8899aa'],
+    saved:  ['✓ Synced',     '#35b05e'],
+    error:  ['✗ Sync failed','#ff6b6b'],
+    idle:   ['',             'transparent']
+  };
+  el.textContent = map[status][0];
+  el.style.color = map[status][1];
+  if (status === 'saved') setTimeout(() => showSyncStatus('idle'), 2500);
+}
+
+async function saveToCloud(s) {
+  try {
+    showSyncStatus('saving');
+    const res = await fetch(BIN_URL, { method:'PUT', headers:HDR, body:JSON.stringify(s) });
+    if (!res.ok) throw new Error();
+    showSyncStatus('saved');
+  } catch { showSyncStatus('error'); }
+}
+
+async function loadFromCloud() {
+  try {
+    const res  = await fetch(BIN_URL + '/latest', { headers: HDR });
+    const json = await res.json();
+    if (json.record && json.record.categories) return json.record;
+  } catch {}
+  return null;
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => saveToCloud(state), 1500);
+}
 
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (s && s.categories) return s;
-  } catch(e){}
-  // default state
+  } catch {}
   return {
     categories: CATEGORIES.map(c => ({
-      id: c.id,
-      collapsed: false,
+      id: c.id, collapsed: false,
       habits: c.defaultHabits.map(n => ({ name: n, log: {} }))
     }))
   };
 }
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 let state = loadState();
+let viewYM = toYM(new Date());
 
 // ══════════════════════════════════════════════
 // DATE HELPERS
@@ -1333,7 +1375,44 @@ document.getElementById('chart-legend').addEventListener('click', e => {
   drawChart();
 });
 
-render();
+// EXPORT / IMPORT
+function exportData() {
+  const data = JSON.stringify(state, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const date = new Date().toISOString().split('T')[0];
+  a.href = url; a.download = `habits-${date}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+function importData(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imp = JSON.parse(e.target.result);
+      if (!imp.categories) throw new Error();
+      if (!confirm('This will replace data on this device. Continue?')) return;
+      state = imp; saveState(); render();
+      alert('Imported successfully!');
+    } catch { alert('Invalid file.'); }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// Boot: load from cloud first, then render
+(async () => {
+  const el = document.getElementById('sync-status');
+  if (el) { el.textContent = '⟳ Loading...'; el.style.color = '#8899aa'; }
+  const cloud = await loadFromCloud();
+  if (cloud) {
+    state = cloud;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  if (el) { el.textContent = ''; }
+  render();
+})();
 </script>
 </body>
 </html>
